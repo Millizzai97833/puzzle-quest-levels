@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puzzle Quest Levels</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#111827,#312e81,#581c87);color:white;min-height:100vh;text-align:center;padding:18px}
+h1{font-size:clamp(28px,7vw,44px);margin:12px 0;color:#facc15}
+p{line-height:1.5}
+.panel{max-width:650px;margin:15px auto;background:#ffffff12;border:1px solid #ffffff25;border-radius:20px;padding:18px}
+.stats{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:14px}
+.stat{background:#111827aa;border-radius:12px;padding:10px 16px}
+button{border:0;border-radius:12px;padding:12px 17px;margin:5px;background:#facc15;color:#1f2937;font-weight:bold;font-size:15px;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+button:disabled{opacity:.4;cursor:not-allowed}
+#board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;max-width:440px;margin:20px auto}
+.card{aspect-ratio:1;background:#4338ca;color:white;border:2px solid #818cf8;border-radius:13px;font-size:clamp(23px,7vw,38px);display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
+.card.open,.card.matched{background:#f8fafc;color:#111827;border-color:#facc15}
+.card.matched{background:#bbf7d0;border-color:#22c55e;cursor:default}
+#message{min-height:28px;font-weight:bold;color:#fde68a}
+#levels{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:15px}
+.level{margin:0;padding:12px 4px}
+footer{opacity:.7;font-size:12px;margin:25px auto}
+</style>
+</head>
+<body>
+<h1>🧩 Puzzle Quest</h1>
+<p>Match the pairs, earn stars, and unlock all 12 levels!</p>
+
+<div class="panel">
+  <div class="stats">
+    <div class="stat">⭐ Stars: <span id="stars">0</span></div>
+    <div class="stat">🎯 Level: <span id="levelNumber">1</span>/12</div>
+    <div class="stat">👣 Moves: <span id="moves">0</span></div>
+  </div>
+  <div id="message">Find all matching pairs to win!</div>
+  <div id="board"></div>
+  <button onclick="restartLevel()">🔄 Restart</button>
+  <button onclick="useHint()">💡 Hint</button>
+  <button onclick="showLevels()">🗺️ Levels</button>
+  <button onclick="nextLevel()">➡️ Next Level</button>
+  <div id="levels" hidden></div>
+</div>
+
+<div class="panel">
+  <h2>🏆 How to Play</h2>
+  <p>1. Tap any two cards to reveal their symbols.</p>
+  <p>2. Find two matching symbols to keep them open.</p>
+  <p>3. Match every pair to complete the level.</p>
+  <p>4. Complete levels to earn stars and unlock new challenges.</p>
+</div>
+<footer>Puzzle Quest Levels • Made for puzzle lovers</footer>
+
+<script>
+const symbols=["🍎","🚀","🎮","💎","🐼","⚽","🌟","🍕","🦋","🎁","🌈","🐸","🎯","🍉","🧸","👑"];
+let level=1,moves=0,stars=Number(localStorage.getItem("pqStars")||0);
+let unlocked=Number(localStorage.getItem("pqUnlocked")||1);
+let first=null,second=null,locked=false,matched=0,hints=0,deck=[];
+const $=id=>document.getElementById(id);
+
+function save(){
+ localStorage.setItem("pqStars",stars);
+ localStorage.setItem("pqUnlocked",unlocked);
+}
+function updateStats(){
+ $("stars").textContent=stars;
+ $("levelNumber").textContent=level;
+ $("moves").textContent=moves;
+}
+function startLevel(){
+ moves=0;matched=0;first=null;second=null;locked=false;
+ $("message").textContent="Find all matching pairs!";
+ $("levels").hidden=true;
+ const pairs=Math.min(4+Math.floor((level-1)/2),8);
+ deck=[...symbols.slice(0,pairs),...symbols.slice(0,pairs)]
+ .sort(()=>Math.random()-.5);
+ $("board").innerHTML="";
+ deck.forEach((symbol,index)=>{
+  const card=document.createElement("button");
+  card.className="card";
+  card.textContent="?";
+  card.setAttribute("aria-label","Hidden card");
+  card.onclick=()=>flip(card,symbol,index);
+  $("board").appendChild(card);
+ });
+ updateStats();
+ $("board").style.gridTemplateColumns=pairs>=7?"repeat(4,minmax(0,1fr))":"repeat(4,minmax(0,1fr))";
+}
+function flip(card,symbol,index){
+ if(locked||card.classList.contains("matched")||card===first)return;
+ card.textContent=symbol;card.classList.add("open");
+ if(!first){first=card;first.dataset.symbol=symbol;return}
+ second=card;moves++;updateStats();
+ if(first.dataset.symbol===symbol){
+  first.classList.remove("open");second.classList.remove("open");
+  first.classList.add("matched");second.classList.add("matched");
+  matched+=2;first=null;second=null;
+  if(matched===deck.length)winLevel();
+ }else{
+  locked=true;
+  setTimeout(()=>{
+   if(first){first.textContent="?";first.classList.remove("open")}
+   if(second){second.textContent="?";second.classList.remove("open")}
+   first=null;second=null;locked=false;
+  },750);
+ }
+}
+function winLevel(){
+ const earned=Math.max(1,3-Math.floor(moves/(deck.length||1)));
+ stars+=earned;unlocked=Math.max(unlocked,Math.min(12,level+1));save();updateStats();
+ $("message").textContent="🎉 Level complete! You earned "+earned+" star(s)!";
+ if(level===12)$("message").textContent="🏆 Amazing! You completed all 12 levels!";
+}
+function restartLevel(){startLevel()}
+function nextLevel(){
+ if(level>=unlocked&&level!==12){
+  $("message").textContent="Complete this level first to unlock the next one!";
+  return;
+ }
+ if(level===12){$("message").textContent="You've reached the final level!";return}
+ if(matched!==deck.length&&level>=unlocked){
+  $("message").textContent="Match all pairs before moving to the next level!";
+  return;
+ }
+ level=Math.min(12,level+1);startLevel();
+}
+function useHint(){
+ if(locked)return;
+ const remaining=[...$("board").children].filter(c=>!c.classList.contains("matched"));
+ if(remaining.length<2){$("message").textContent="No cards left to hint!";return}
+ const symbol=deck.find((s,i)=>!$("board").children[i].classList.contains("matched"));
+ const indexes=deck.map((s,i)=>s===symbol&&!$("board").children[i].classList.contains("matched")?i:-1).filter(i=>i>=0);
+ indexes.slice(0,2).forEach(i=>{
+  const c=$("board").children[i];c.textContent=deck[i];c.classList.add("open");
+ });
+ $("message").textContent="💡 Hint: look for the matching symbols!";
+ setTimeout(()=>{
+  indexes.slice(0,2).forEach(i=>{
+   const c=$("board").children[i];
+   if(!c.classList.contains("matched")&&c!==first&&c!==second){
+    c.textContent="?";c.classList.remove("open");
+   }
+  });
+ },1000);
+}
+function showLevels(){
+ const box=$("levels");box.innerHTML="";box.hidden=!box.hidden;
+ if(box.hidden)return;
+ for(let i=1;i<=12;i++){
+  const b=document.createElement("button");
+  b.className="level";b.textContent=(i<=unlocked?"🔓 ":"🔒 ")+i;
+  b.disabled=i>unlocked;
+  b.onclick=()=>{level=i;startLevel()};
+  box.appendChild(b);
+ }
+}
+startLevel();
+</script>
+</body>
+</html>
